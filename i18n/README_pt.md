@@ -1,12 +1,12 @@
 # free-llm-api-keys-python
 
 <p align="center">
-  <img src="assets/banner.jpg" alt="Free LLM API Keys Banner" width="100%"/>
+  <img src="../assets/banner.jpg" alt="Free LLM API Keys Banner" width="100%"/>
 </p>
 
 <!-- README-I18N:START -->
 
-[English](../README.md) | [中文](README_zh.md) | [हिंदी](README_hi.md) | [Español](README_es.md) | [Français](README_fr.md) | [العربية](README_ar.md) | [বাংলা](README_bn.md) | [Русский](README_ru.md) | **Português** | [Bahasa Indonesia](README_id.md)
+[English](https://github.com/laurentvv/free-llm-api-keys-python) | [中文](README_zh.md) | [हिंदी](README_hi.md) | [Español](README_es.md) | [Français](README_fr.md) | [العربية](README_ar.md) | [বাংলা](README_bn.md) | [Русский](README_ru.md) | **Português** | [Bahasa Indonesia](README_id.md)
 
 <!-- README-I18N:END -->
 
