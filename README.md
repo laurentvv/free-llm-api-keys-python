@@ -6,7 +6,7 @@
 
 <!-- README-I18N:START -->
 
-**English** | [中文](./README.zh.md) | [हिंदी](./README.hi.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [العربية](./README.ar.md) | [বাংলা](./README.bn.md) | [Русский](./README.ru.md) | [Português](./README.pt.md) | [Bahasa Indonesia](./README.id.md)
+**English** | [中文](i18n/README_zh.md) | [हिंदी](i18n/README_hi.md) | [Español](i18n/README_es.md) | [Français](i18n/README_fr.md) | [العربية](i18n/README_ar.md) | [বাংলা](i18n/README_bn.md) | [Русский](i18n/README_ru.md) | [Português](i18n/README_pt.md) | [Bahasa Indonesia](i18n/README_id.md)
 
 <!-- README-I18N:END -->
 
