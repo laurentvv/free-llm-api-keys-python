@@ -159,6 +159,16 @@ class Catalog:
                 readme_updated_at = parsed.readme_updated_at
                 logger.info("README parsé : %d clés trouvées (version %s).",
                             len(keys), readme_updated_at or "?")
+
+                # Vérification : changement de Base URL dans le README
+                from .client import DEFAULT_BASE_URL
+                if parsed.base_url and parsed.base_url != DEFAULT_BASE_URL:
+                    logger.warning(
+                        "ATTENTION: La Base URL définie dans le README distant (%s) "
+                        "ne correspond pas à la valeur par défaut du script (%s). "
+                        "Pensez à mettre à jour free-llm-api-keys !",
+                        parsed.base_url, DEFAULT_BASE_URL
+                    )
             else:
                 # 304 Not Modified : on conserve le cache précédent.
                 keys = list(fallback.keys) if fallback else []

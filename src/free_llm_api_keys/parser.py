@@ -191,6 +191,15 @@ def extract_readme_updated_at(markdown: str) -> str:
             return m.group(1).strip()
     return ""
 
+_BASE_URL_RE = re.compile(r"\*\*Base URL:\*\*\s*`([^`]+)`", re.IGNORECASE)
+
+def extract_base_url(markdown: str) -> str:
+    """Extrait la Base URL définie dans le README."""
+    m = _BASE_URL_RE.search(markdown)
+    if m:
+        return m.group(1).strip()
+    return ""
+
 
 @dataclass
 class ParsedCatalog:
@@ -198,6 +207,7 @@ class ParsedCatalog:
 
     keys: list[KeyEntry]
     readme_updated_at: str = ""
+    base_url: str = ""
 
 
 def parse_readme_full(markdown: str) -> ParsedCatalog:
@@ -210,6 +220,7 @@ def parse_readme_full(markdown: str) -> ParsedCatalog:
         raise ParseError("README vide.")
 
     readme_updated_at = extract_readme_updated_at(markdown)
+    base_url = extract_base_url(markdown)
 
     lines = markdown.splitlines()
     section = _slice_section(lines)
@@ -239,7 +250,7 @@ def parse_readme_full(markdown: str) -> ParsedCatalog:
 
         i += 1
 
-    return ParsedCatalog(keys=entries, readme_updated_at=readme_updated_at)
+    return ParsedCatalog(keys=entries, readme_updated_at=readme_updated_at, base_url=base_url)
 
 def _parse_table_block(
     section: list[str],
