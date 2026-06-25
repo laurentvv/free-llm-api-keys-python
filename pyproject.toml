@@ -1,0 +1,22 @@
+[project]
+name = "free-llm-api-keys"
+version = "0.1.0"
+description = "Client Python (format OpenAI) pour les clés IA gratuites de alistaitsacle/free-llm-api-keys, avec cache et auto-rotation des clés."
+readme = "README.md"
+authors = [
+    { name = "Laurent VOLFF", email = "laurentvv@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "openai>=2.44.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.5,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
