@@ -116,20 +116,22 @@ class FreeLLMClient:
     # ------------------------------------------------------------------ #
     def _resolve_keys(self, model: str | None, type_: str | ModelCategory | None) -> list[KeyEntry]:
         if model:
-            keys = self._catalog.get_keys(model)
-            if not keys:
-                # Recherche insensible à la casse / espaces en fallback.
-                norm = model.strip().lower()
-                keys = [
-                    e for e in self._catalog.all_keys() if e.model.strip().lower() == norm
-                ]
-            if not keys:
-                raise NoKeysAvailableError(
-                    f"Aucune clé trouvée pour le modèle '{model}'. "
-                    f"Modèles disponibles : {self._catalog.list_models()}"
-                )
-            return keys
+            return self._resolve_by_model(model)
+        return self._resolve_by_type(type_)
 
+    def _resolve_by_model(self, model: str) -> list[KeyEntry]:
+        keys = self._catalog.get_keys(model)
+        if not keys:
+            norm = model.strip().lower()
+            keys = [e for e in self._catalog.all_keys() if e.model.strip().lower() == norm]
+        if not keys:
+            raise NoKeysAvailableError(
+                f"Aucune clé trouvée pour le modèle '{model}'. "
+                f"Modèles disponibles : {self._catalog.list_models()}"
+            )
+        return keys
+
+    def _resolve_by_type(self, type_: str | ModelCategory | None) -> list[KeyEntry]:
         if isinstance(type_, str):
             try:
                 type_ = ModelCategory(type_.lower())
@@ -141,9 +143,7 @@ class FreeLLMClient:
             models = self._catalog.list_models(category=type_)
 
         if not models:
-            raise NoKeysAvailableError(
-                f"Aucune clé trouvée pour le type '{type_}'."
-            )
+            raise NoKeysAvailableError(f"Aucune clé trouvée pour le type '{type_}'.")
 
         keys = []
         for m in models:

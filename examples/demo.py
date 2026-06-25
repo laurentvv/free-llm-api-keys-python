@@ -23,36 +23,18 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-# Permet d'exécuter le script sans installer le paquet (depuis la racine du dépôt).
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from utils import BOLD, CYAN, GREEN, RED, YELLOW, _c
 
-from free_llm_api_keys import (  # noqa: E402
+from free_llm_api_keys import (
+    AllKeysExhaustedError,
     Catalog,
     FreeLLMClient,
     ModelCategory,
     NoKeysAvailableError,
-    AllKeysExhaustedError,
 )
 
-# ────────────────────────────────────────────────────────────────────── #
-#  Utilitaires d'affichage
-# ────────────────────────────────────────────────────────────────────── #
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-
-
-def _supports_color() -> bool:
-    return sys.stdout.isatty()
-
-
-def c(text: str, color: str) -> str:
-    if not _supports_color():
-        return text
-    return f"{color}{text}{RESET}"
+# Utilities are now in utils.py
+c = _c
 
 
 def header(title: str) -> None:
@@ -142,8 +124,8 @@ def test_text(model: str | None) -> None:
         except NoKeysAvailableError as exc:
             warn(f"aucune clé ({exc}).")
             continue
-        except AllKeysExhaustedError as exc:
-            warn(f"toutes les clés ont échoué. On essaie le suivant.")
+        except AllKeysExhaustedError:
+            warn("toutes les clés ont échoué. On essaie le suivant.")
             continue
         except Exception as exc:  # noqa: BLE001
             warn(f"{type(exc).__name__}: {exc}")

@@ -29,31 +29,15 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from utils import BOLD, CYAN, DIM, GREEN, RED, YELLOW, _c
 
-from free_llm_api_keys import (  # noqa: E402
+from free_llm_api_keys import (
     AllKeysExhaustedError,
     Catalog,
     FreeLLMClient,
     ModelCategory,
     NoKeysAvailableError,
 )
-
-# ────────────────────────────────────────────────────────────────────── #
-#  Couleurs
-# ────────────────────────────────────────────────────────────────────── #
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-BOLD = "\033[1m"
-DIM = "\033[2m"
-RESET = "\033[0m"
-
-
-def _c(text: str, color: str) -> str:
-    return f"{color}{text}{RESET}" if sys.stdout.isatty() else text
-
 
 # ────────────────────────────────────────────────────────────────────── #
 #  Probes par catégorie
@@ -155,7 +139,7 @@ def run_cleanup(catalog: Catalog, *, full: bool) -> dict[str, dict[str, object]]
 
     print(_c("\n" + "═" * 60, CYAN))
     print(
-        _c(f"  Bilan : ", BOLD)
+        _c("  Bilan : ", BOLD)
         + _c(f"{total_ok} OK", GREEN)
         + ", "
         + _c(f"{total_fail} défaillants", RED if total_fail else DIM)

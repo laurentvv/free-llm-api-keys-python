@@ -19,7 +19,7 @@ du tableau pour être robuste.
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Iterable
 
 from .classifier import ModelCategory, classify
@@ -158,26 +158,20 @@ def _build_entry(
     Retourne ``None`` si la ligne n'a pas de clé exploitable.
     """
     row = dict(zip(fields_, cells))
-    key = (row.get("key") or "").strip()
+    key = row.get("key", "").strip().strip("`").strip()
     if not key:
         return None
-    # Nettoyage : retirer les backticks/espaces autour de la clé.
-    key = key.strip("`").strip()
-    if not key:
-        return None
-    model = (row.get("model") or display_name or "").strip().strip("`")
-    if not model:
-        # Si le tableau n'a pas de colonne "model" lisible, on retombe
-        # sur le nom affiché dans le titre de la sous-section.
-        model = display_name
+
+    model = row.get("model", "").strip().strip("`") or display_name
+
     return KeyEntry(
         key=key,
         model=model,
-        status=(row.get("status") or "").strip(),
-        budget=(row.get("budget") or "").strip(),
-        rate_limit=(row.get("rate_limit") or "").strip(),
-        expires=(row.get("expires") or "").strip(),
-        description=(row.get("description") or "").strip(),
+        status=row.get("status", "").strip(),
+        budget=row.get("budget", "").strip(),
+        rate_limit=row.get("rate_limit", "").strip(),
+        expires=row.get("expires", "").strip(),
+        description=row.get("description", "").strip(),
         display_name=display_name,
         category=classify(model),
         source_timestamp=timestamp,
@@ -240,37 +234,41 @@ def parse_readme_full(markdown: str) -> ParsedCatalog:
 
         # Début d'un tableau ? On cherche l'en-tête puis la ligne de séparation.
         if _is_row(line):
-            fields_ = _parse_header(line)
-            if fields_ is not None:
-                # La ligne suivante doit être le séparateur |---|---|.
-                if i + 1 < n and _TABLE_SEP_RE.match(section[i + 1]):
-                    i += 2  # skip header + separator
-                    # Lignes de données jusqu'à sortir du tableau.
-                    while i < n and _is_row(section[i]):
-                        cells = _parse_row(section[i])
-                        entry = _build_entry(
-                            fields_, cells, current_display_name, current_timestamp
-                        )
-                        if entry is not None:
-                            entries.append(entry)
-                        i += 1
-                    continue
-                # Sinon, c'est peut-être un tableau sans séparateur clair :
-                # on tente quand même les lignes suivantes.
-                i += 1
-                while i < n and _is_row(section[i]):
-                    cells = _parse_row(section[i])
-                    entry = _build_entry(
-                        fields_, cells, current_display_name, current_timestamp
-                    )
-                    if entry is not None:
-                        entries.append(entry)
-                    i += 1
-                continue
+            i = _parse_table_block(section, i, current_display_name, current_timestamp, entries)
+            continue
 
         i += 1
 
     return ParsedCatalog(keys=entries, readme_updated_at=readme_updated_at)
+
+def _parse_table_block(
+    section: list[str],
+    i: int,
+    current_display_name: str,
+    current_timestamp: str,
+    entries: list[KeyEntry]
+) -> int:
+    line = section[i]
+    fields_ = _parse_header(line)
+    if fields_ is None:
+        return i + 1
+
+    n = len(section)
+    if i + 1 < n and _TABLE_SEP_RE.match(section[i + 1]):
+        i += 2  # skip header + separator
+    else:
+        i += 1  # tableau sans séparateur clair
+
+    # Lignes de données jusqu'à sortir du tableau.
+    while i < n and _is_row(section[i]):
+        cells = _parse_row(section[i])
+        entry = _build_entry(
+            fields_, cells, current_display_name, current_timestamp
+        )
+        if entry is not None:
+            entries.append(entry)
+        i += 1
+    return i
 
 
 def parse_readme(markdown: str) -> list[KeyEntry]:

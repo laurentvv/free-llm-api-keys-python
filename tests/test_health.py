@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from free_llm_api_keys.catalog import Catalog
 from free_llm_api_keys.classifier import ModelCategory
-from free_llm_api_keys.health import HealthState, HealthStatus, HealthStore
+from free_llm_api_keys.health import HealthStatus, HealthStore
 from free_llm_api_keys.parser import KeyEntry
 
 
