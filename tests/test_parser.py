@@ -24,6 +24,8 @@ SAMPLE_README = textwrap.dedent(
 
     Quelques clés gratuites.
 
+    > ⏰ Last updated: 2026-06-25 19:22 (UTC+8)
+
     ## 📋 Available Keys
 
     ### GPT-5.5 `2026-06-25T12:00Z`
@@ -33,20 +35,20 @@ SAMPLE_README = textwrap.dedent(
     | sk-text-aaa | gpt-5.5 | Active | $50 | 30 req/min | 48h | Modèle texte principal |
     | sk-text-bbb | gpt-5.5 | Active | $20 | 30 req/min | 48h | Clé de secours |
 
-    ### DALL-E 3 `2026-06-25T12:00Z`
+    ### DALL-E 3 `06-25 19:22`
 
     | Key | Model | Status | Budget | Rate Limit | Expires | Description |
     |-----|-------|--------|--------|------------|---------|-------------|
     | sk-img-aaa | dall-e-3 | Active | $10 | 5 req/min | 48h | Génération d'images |
 
-    ### TTS HD `2026-06-25T12:00Z`
+    ### TTS HD `06-25 18:30`
 
     | Key | Model | Status | Budget | Rate Limit | Expires | Description |
     |-----|-------|--------|--------|------------|---------|-------------|
     | sk-tts-aaa | tts-1-hd | Expired | $0 | 0 req/min | expired | Clé expirée |
     | sk-tts-bbb | tts-1-hd | Active | $5 | 10 req/min | 24h | Synthèse vocale |
 
-    ### Embeddings `2026-06-25T12:00Z`
+    ### Embeddings `06-25 10:30`
 
     | Key | Model | Status | Budget | Rate Limit | Expires | Description |
     |-----|-------|--------|--------|------------|---------|-------------|
@@ -153,3 +155,33 @@ def test_parse_table_without_model_column_uses_display_name() -> None:
     assert len(entries) == 1
     assert entries[0].model == "Claude Opus"
     assert entries[0].category == ModelCategory.TEXTE
+
+
+# ────────────────────────────────────────────────────────────────── #
+#  Suivi de version (timestamps)
+# ────────────────────────────────────────────────────────────────── #
+def test_extract_readme_updated_at() -> None:
+    from free_llm_api_keys.parser import extract_readme_updated_at
+
+    assert extract_readme_updated_at(SAMPLE_README) == "2026-06-25 19:22"
+    assert extract_readme_updated_at("# pas de date\n\nrien") == ""
+
+
+def test_parse_readme_full_captures_version() -> None:
+    from free_llm_api_keys.parser import parse_readme_full
+
+    parsed = parse_readme_full(SAMPLE_README)
+    assert parsed.readme_updated_at == "2026-06-25 19:22"
+    assert len(parsed.keys) == 6
+
+
+def test_source_timestamp_per_entry() -> None:
+    """Chaque clé porte le timestamp de sa section ###."""
+    entries = parse_readme(SAMPLE_README)
+    by_key = {e.key: e for e in entries}
+    # GPT-5.5 a un timestamp au format ISO complet dans le titre.
+    assert by_key["sk-text-aaa"].source_timestamp == "2026-06-25T12:00Z"
+    # DALL-E et TTS utilisent le format court MM-DD HH:MM.
+    assert by_key["sk-img-aaa"].source_timestamp == "06-25 19:22"
+    assert by_key["sk-tts-bbb"].source_timestamp == "06-25 18:30"
+

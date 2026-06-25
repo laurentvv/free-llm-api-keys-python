@@ -55,8 +55,11 @@ class CacheEntry:
     """Contenu sérialisé du catalogue de clés."""
 
     fetched_at: datetime
-    etag: str | None
+    etag: str | None = None
     keys: list[KeyEntry] = field(default_factory=list)
+    # Version du README source (date ``Last updated``). Sert à réinitialiser
+    # l'état de santé quand le catalogue change.
+    readme_updated_at: str = ""
 
     @property
     def fetched_at_iso(self) -> str:
@@ -71,6 +74,7 @@ class CacheEntry:
             {
                 "fetched_at": self.fetched_at_iso,
                 "etag": self.etag,
+                "readme_updated_at": self.readme_updated_at,
                 "keys": [k.to_dict() for k in self.keys],
             },
             ensure_ascii=False,
@@ -87,7 +91,12 @@ class CacheEntry:
             fetched_at = datetime(1970, 1, 1, tzinfo=timezone.utc)
         keys_data = data.get("keys") or []
         keys = [KeyEntry.from_dict(k) for k in keys_data]
-        return cls(fetched_at=fetched_at, etag=data.get("etag"), keys=keys)
+        return cls(
+            fetched_at=fetched_at,
+            etag=data.get("etag"),
+            keys=keys,
+            readme_updated_at=str(data.get("readme_updated_at", "")),
+        )
 
 
 class CatalogCache:
@@ -113,8 +122,18 @@ class CatalogCache:
             logger.info("Cache présent mais stale (âgé de plus de %ds).", DEFAULT_TTL_SECONDS)
         return entry
 
-    def save(self, keys: Iterable[KeyEntry], etag: str | None = None) -> CacheEntry:
-        entry = CacheEntry(fetched_at=_now(), etag=etag, keys=list(keys))
+    def save(
+        self,
+        keys: Iterable[KeyEntry],
+        etag: str | None = None,
+        readme_updated_at: str = "",
+    ) -> CacheEntry:
+        entry = CacheEntry(
+            fetched_at=_now(),
+            etag=etag,
+            keys=list(keys),
+            readme_updated_at=readme_updated_at,
+        )
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(entry.to_json(), encoding="utf-8")

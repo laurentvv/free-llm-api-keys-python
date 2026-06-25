@@ -31,6 +31,11 @@ _TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{3,}.*$")
 # En-tête de modèle : ``### Nom `timestamp``` ou simplement ``### Nom``.
 _MODEL_HEADER_RE = re.compile(r"^###\s+(.+?)(?:\s+`([^`]+)`)?\s*$")
 
+# Ligne de date globale du README : ``> ⏰ Last updated: 2026-06-25 19:22 (UTC+8)``.
+_LAST_UPDATED_RE = re.compile(
+    r"Last updated:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})", re.IGNORECASE
+)
+
 # Bornes de la section à parser. On normalise les espaces pour repérer
 # ces titres indépendamment des variations d'emoji/spacing.
 _AVAILABLE_KEYS_RE = re.compile(r"^##\s+.*Available Keys", re.IGNORECASE)
@@ -65,6 +70,9 @@ class KeyEntry:
     description: str = ""
     display_name: str = ""
     category: ModelCategory = ModelCategory.TEXTE
+    # Horodatage lu dans le titre ``### Nom `MM-DD HH:MM``` (heure d'ajout
+    # de la section dans le README source). Sert au suivi / nettoyage.
+    source_timestamp: str = ""
 
     def to_dict(self) -> dict[str, object]:
         d = asdict(self)
@@ -87,6 +95,7 @@ class KeyEntry:
             description=str(data.get("description", "")),
             display_name=str(data.get("display_name", "")),
             category=category,  # type: ignore[arg-type]
+            source_timestamp=str(data.get("source_timestamp", "")),
         )
 
 
@@ -142,7 +151,7 @@ def _is_row(line: str) -> bool:
 
 
 def _build_entry(
-    fields_: list[str], cells: list[str], display_name: str
+    fields_: list[str], cells: list[str], display_name: str, timestamp: str = ""
 ) -> KeyEntry | None:
     """Construit une :class:`KeyEntry` à partir d'une ligne de tableau.
 
@@ -171,35 +180,49 @@ def _build_entry(
         description=(row.get("description") or "").strip(),
         display_name=display_name,
         category=classify(model),
+        source_timestamp=timestamp,
     )
 
 
-def parse_readme(markdown: str) -> list[KeyEntry]:
-    """Parse le contenu markdown du README -> liste de :class:`KeyEntry`.
+def extract_readme_updated_at(markdown: str) -> str:
+    """Extrait la date globale ``Last updated: ...`` du README.
 
-    Robuste aux variations de format : se cale sur l'en-tête de chaque
-    tableau pour nommer les colonnes, ignore les tableaux sans clé,
-    ignore les statuts (on garde toutes les clés, le filtrage se fait
-    côté client).
+    Retourne la chaîne brute (ex. ``"2026-06-25 19:22"``) ou ``""`` si
+    introuvable. C'est l'identifiant de version du catalogue : quand il
+    change, l'état de santé (ce qui marche / ne marche pas) est réinitialisé.
+    """
+    for line in markdown.splitlines():
+        m = _LAST_UPDATED_RE.search(line)
+        if m:
+            return m.group(1).strip()
+    return ""
 
-    Args:
-        markdown: Contenu brut du fichier ``README.md``.
 
-    Returns:
-        Liste des clés trouvées (potentiellement vide si la section
-        ne contient aucune clé).
+@dataclass
+class ParsedCatalog:
+    """Résultat complet du parsing : clés + date de version du README."""
 
-    Raises:
-        ParseError: Si la section ``Available Keys`` est absente.
+    keys: list[KeyEntry]
+    readme_updated_at: str = ""
+
+
+def parse_readme_full(markdown: str) -> ParsedCatalog:
+    """Parse le README -> :class:`ParsedCatalog` (clés + date de version).
+
+    Variante enrichie de :func:`parse_readme` qui renvoie aussi la date
+    ``Last updated`` du README (identifiant de version pour le suivi).
     """
     if not markdown or not markdown.strip():
         raise ParseError("README vide.")
+
+    readme_updated_at = extract_readme_updated_at(markdown)
 
     lines = markdown.splitlines()
     section = _slice_section(lines)
 
     entries: list[KeyEntry] = []
     current_display_name = ""
+    current_timestamp = ""
 
     i = 0
     n = len(section)
@@ -210,6 +233,8 @@ def parse_readme(markdown: str) -> list[KeyEntry]:
         header_match = _MODEL_HEADER_RE.match(line)
         if header_match:
             current_display_name = (header_match.group(1) or "").strip()
+            # Le 2e groupe de capture est le timestamp ``MM-DD HH:MM``.
+            current_timestamp = (header_match.group(2) or "").strip()
             i += 1
             continue
 
@@ -223,7 +248,9 @@ def parse_readme(markdown: str) -> list[KeyEntry]:
                     # Lignes de données jusqu'à sortir du tableau.
                     while i < n and _is_row(section[i]):
                         cells = _parse_row(section[i])
-                        entry = _build_entry(fields_, cells, current_display_name)
+                        entry = _build_entry(
+                            fields_, cells, current_display_name, current_timestamp
+                        )
                         if entry is not None:
                             entries.append(entry)
                         i += 1
@@ -233,7 +260,9 @@ def parse_readme(markdown: str) -> list[KeyEntry]:
                 i += 1
                 while i < n and _is_row(section[i]):
                     cells = _parse_row(section[i])
-                    entry = _build_entry(fields_, cells, current_display_name)
+                    entry = _build_entry(
+                        fields_, cells, current_display_name, current_timestamp
+                    )
                     if entry is not None:
                         entries.append(entry)
                     i += 1
@@ -241,7 +270,31 @@ def parse_readme(markdown: str) -> list[KeyEntry]:
 
         i += 1
 
-    return entries
+    return ParsedCatalog(keys=entries, readme_updated_at=readme_updated_at)
+
+
+def parse_readme(markdown: str) -> list[KeyEntry]:
+    """Parse le contenu markdown du README -> liste de :class:`KeyEntry`.
+
+    Robuste aux variations de format : se cale sur l'en-tête de chaque
+    tableau pour nommer les colonnes, ignore les tableaux sans clé,
+    ignore les statuts (on garde toutes les clés, le filtrage se fait
+    côté client).
+
+    Pour obtenir aussi la date de version du README, préférer
+    :func:`parse_readme_full`.
+
+    Args:
+        markdown: Contenu brut du fichier ``README.md``.
+
+    Returns:
+        Liste des clés trouvées (potentiellement vide si la section
+        ne contient aucune clé).
+
+    Raises:
+        ParseError: Si la section ``Available Keys`` est absente.
+    """
+    return parse_readme_full(markdown).keys
 
 
 def dedupe(entries: Iterable[KeyEntry]) -> list[KeyEntry]:

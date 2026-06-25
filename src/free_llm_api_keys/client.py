@@ -90,38 +90,64 @@ class FreeLLMClient:
 
     def __init__(
         self,
-        model: str,
+        model: str | None = None,
         *,
+        type: str | ModelCategory | None = None,
         base_url: str = DEFAULT_BASE_URL,
         catalog: Catalog | None = None,
         max_retries: int = MAX_RETRIES,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
+        if model is None and type is None:
+            type = ModelCategory.TEXTE
+
         self.model = model
+        self.type = type
         self.base_url = base_url
         self._catalog = catalog if catalog is not None else Catalog.load()
         self.max_retries = max_retries
         self.timeout = timeout
-        self._keys: list[KeyEntry] = self._resolve_keys(model)
+        self._keys: list[KeyEntry] = self._resolve_keys(model, type)
         # Index de rotation courant (tourne en rond si tout échoue).
         self._cursor = 0
 
     # ------------------------------------------------------------------ #
     # Résolution des clés
     # ------------------------------------------------------------------ #
-    def _resolve_keys(self, model: str) -> list[KeyEntry]:
-        keys = self._catalog.get_keys(model)
-        if not keys:
-            # Recherche insensible à la casse / espaces en fallback.
-            norm = model.strip().lower()
-            keys = [
-                e for e in self._catalog.all_keys() if e.model.strip().lower() == norm
-            ]
-        if not keys:
+    def _resolve_keys(self, model: str | None, type_: str | ModelCategory | None) -> list[KeyEntry]:
+        if model:
+            keys = self._catalog.get_keys(model)
+            if not keys:
+                # Recherche insensible à la casse / espaces en fallback.
+                norm = model.strip().lower()
+                keys = [
+                    e for e in self._catalog.all_keys() if e.model.strip().lower() == norm
+                ]
+            if not keys:
+                raise NoKeysAvailableError(
+                    f"Aucune clé trouvée pour le modèle '{model}'. "
+                    f"Modèles disponibles : {self._catalog.list_models()}"
+                )
+            return keys
+
+        if isinstance(type_, str):
+            try:
+                type_ = ModelCategory(type_.lower())
+            except ValueError:
+                pass
+
+        models = self._catalog.list_models(category=type_, only_healthy=True)
+        if not models:
+            models = self._catalog.list_models(category=type_)
+
+        if not models:
             raise NoKeysAvailableError(
-                f"Aucune clé trouvée pour le modèle '{model}'. "
-                f"Modèles disponibles : {self._catalog.list_models()}"
+                f"Aucune clé trouvée pour le type '{type_}'."
             )
+
+        keys = []
+        for m in models:
+            keys.extend(self._catalog.get_keys(m))
         return keys
 
     def _client_for(self, key: str) -> OpenAI:
@@ -130,7 +156,7 @@ class FreeLLMClient:
     # ------------------------------------------------------------------ #
     # Cœur : exécution avec rotation + retry
     # ------------------------------------------------------------------ #
-    def _run(self, fn: Callable[[OpenAI], T]) -> T:
+    def _run(self, fn: Callable[[OpenAI, str], T]) -> T:
         """Exécute ``fn(client)`` sur les clés en rotation, avec retry transitoire.
 
         - Sur erreur *rotatable* (clé refusée) → passe à la clé suivante.
@@ -153,8 +179,10 @@ class FreeLLMClient:
 
             for retry in range(self.max_retries + 1):
                 try:
-                    result = fn(client)
-                    # Succès : on avance le curseur sur la clé gagnante.
+                    result = fn(client, entry.model)
+                    # Succès : on marque le modèle sain et on avance le
+                    # curseur sur la clé gagnante.
+                    self._catalog.mark_ok(entry.model)
                     self._cursor = (self._cursor + attempts) % n
                     return result
                 except Exception as exc:  # noqa: BLE001 - OpenAI lève des exceptions variées
@@ -162,16 +190,17 @@ class FreeLLMClient:
                     if _is_rotatable(exc):
                         logger.info(
                             "Clé refusée pour '%s' (%s). Rotation vers la suivante.",
-                            self.model,
+                            entry.model,
                             type(exc).__name__,
                         )
+                        self._catalog.mark_failed(entry.model, reason=f"{type(exc).__name__}: {exc}")
                         break  # sortir des retries, passer à la clé suivante
                     if _is_transient(exc) and retry < self.max_retries:
                         delay = BACKOFF_BASE * (2**retry)
                         logger.warning(
                             "Erreur transitoire (%s) sur '%s' : retry dans %.1fs.",
                             type(exc).__name__,
-                            self.model,
+                            entry.model,
                             delay,
                         )
                         time.sleep(delay)
@@ -181,7 +210,10 @@ class FreeLLMClient:
 
             attempts += 1
 
-        raise AllKeysExhaustedError(self.model, n) from last_exc
+        # Toutes les clés ont échoué : on marque le modèle défaillant pour
+        # que le catalogue puisse le skip au prochain appel, puis on lève.
+        target = self.model if self.model else str(self.type)
+        raise AllKeysExhaustedError(target, n) from last_exc
 
     # ------------------------------------------------------------------ #
     # API publique : 4 types de modèles
@@ -202,8 +234,8 @@ class FreeLLMClient:
                 "(texte attendu).", self.model, category.value
             )
 
-        def _do(c: OpenAI) -> str:
-            resp = c.chat.completions.create(model=self.model, messages=messages, **kwargs)
+        def _do(c: OpenAI, m: str) -> str:
+            resp = c.chat.completions.create(model=m, messages=messages, **kwargs)
             return resp.choices[0].message.content or ""
 
         return self._run(_do)
@@ -216,8 +248,8 @@ class FreeLLMClient:
             n: Nombre d'images à générer.
             **kwargs: Options (size, quality, response_format...).
         """
-        def _do(c: OpenAI) -> list[str]:
-            resp = c.images.generate(model=self.model, prompt=prompt, n=n, **kwargs)
+        def _do(c: OpenAI, m: str) -> list[str]:
+            resp = c.images.generate(model=m, prompt=prompt, n=n, **kwargs)
             return [img.url or getattr(img, "b64_json", "") for img in resp.data]
 
         return self._run(_do)
@@ -229,8 +261,8 @@ class FreeLLMClient:
             text: Texte à synthétiser.
             **kwargs: Options (voice, response_format, speed...).
         """
-        def _do(c: OpenAI) -> bytes:
-            resp = c.audio.speech.create(model=self.model, input=text, **kwargs)
+        def _do(c: OpenAI, m: str) -> bytes:
+            resp = c.audio.speech.create(model=m, input=text, **kwargs)
             return resp.content
 
         return self._run(_do)
@@ -242,8 +274,8 @@ class FreeLLMClient:
             input: Un texte ou une liste de textes.
             **kwargs: Options (encoding_format, dimensions...).
         """
-        def _do(c: OpenAI) -> list[list[float]]:
-            resp = c.embeddings.create(model=self.model, input=input, **kwargs)
+        def _do(c: OpenAI, m: str) -> list[list[float]]:
+            resp = c.embeddings.create(model=m, input=input, **kwargs)
             return [d.embedding for d in resp.data]
 
         return self._run(_do)
@@ -253,4 +285,4 @@ class FreeLLMClient:
         return self._keys[0].category if self._keys else ModelCategory.TEXTE
 
     def __repr__(self) -> str:
-        return f"<FreeLLMClient model='{self.model}' keys={len(self._keys)}>"
+        return f"<FreeLLMClient model='{self.model}' type='{self.type}' keys={len(self._keys)}>"

@@ -50,7 +50,7 @@ from free_llm_api_keys import FreeLLMClient
 
 # À l'instanciation, le catalogue se met à jour depuis GitHub si besoin
 # (sinon il utilise le cache local).
-client = FreeLLMClient(model="gpt-5.5")
+client = FreeLLMClient(type="texte")
 
 reponse = client.chat([{"role": "user", "content": "Bonjour !"}])
 print(reponse)
@@ -63,7 +63,7 @@ print(reponse)
 ```python
 from free_llm_api_keys import FreeLLMClient
 
-client = FreeLLMClient(model="gpt-5.5")
+client = FreeLLMClient(type="texte")
 texte = client.chat(
     [{"role": "user", "content": "Explique la photosynthèse en 2 phrases."}],
     temperature=0.7,
@@ -74,7 +74,7 @@ print(texte)
 ### 🖼️ Génération d'images
 
 ```python
-client = FreeLLMClient(model="dall-e-3")
+client = FreeLLMClient(type="image")
 urls = client.generate_image("Un renard cyberpunk dans une forêt néon", n=1, size="1024x1024")
 print(urls[0])  # URL de l'image générée
 ```
@@ -82,7 +82,7 @@ print(urls[0])  # URL de l'image générée
 ### 🔊 Synthèse vocale (TTS)
 
 ```python
-client = FreeLLMClient(model="tts-1-hd")
+client = FreeLLMClient(type="tts")
 audio: bytes = client.tts("Bonjour, ceci est un test.", voice="alloy")
 Path("sortie.mp3").write_bytes(audio)
 ```
@@ -90,7 +90,7 @@ Path("sortie.mp3").write_bytes(audio)
 ### 🧮 Embeddings
 
 ```python
-client = FreeLLMClient(model="text-embedding-3-small")
+client = FreeLLMClient(type="embeddings")
 vecteurs = client.embeddings(["texte un", "texte deux"])
 print(len(vecteurs), len(vecteurs[0]))  # 2 vecteurs de dimension N
 ```
