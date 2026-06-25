@@ -39,7 +39,9 @@ MAX_RETRIES = 3  # retries pour erreurs transitoires (réseau / 5xx)
 BACKOFF_BASE = 0.5  # secondes, multiplié par 2 à chaque essai
 
 # Codes/statuts indiquant qu'une clé est inutilisable : on passe à la suivante.
-_ROTATABLE_STATUS_CODES = {401, 402, 403, 429}
+# 401/403 = clé invalide/non autorisée, 402 = budget épuisé, 429 = rate limit,
+# 404 = endpoint/modèle non trouvé pour cette clé (la suivante peut pointer ailleurs).
+_ROTATABLE_STATUS_CODES = {401, 402, 403, 404, 429}
 
 T = TypeVar("T")
 
@@ -53,6 +55,8 @@ def _is_rotatable(exc: Exception) -> bool:
     if isinstance(exc, openai.AuthenticationError):
         return True
     if isinstance(exc, openai.PermissionDeniedError):
+        return True
+    if isinstance(exc, openai.NotFoundError):
         return True
     if isinstance(exc, openai.RateLimitError):
         return True
