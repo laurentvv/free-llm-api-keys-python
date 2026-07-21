@@ -34,20 +34,24 @@ through available keys.
 
 ## Installation
 
-[uv](https://docs.astral.sh/uv/) project. In your consuming project:
+This package is not yet published on PyPI. You can install it directly from GitHub.
+
+### Using `uv` (Recommended)
 
 ```bash
-# from the local path
-uv add "C:/path/to/free-llm-api-keys-python"
-
-# or via git
-uv add "git+https://github.com/<your-user>/free-llm-api-keys-python.git"
+uv add "git+https://github.com/laurentvv/free-llm-api-keys-python.git"
 ```
 
-Local development:
+### Using `pip`
 
 ```bash
-git clone <this-repo>
+pip install "git+https://github.com/laurentvv/free-llm-api-keys-python.git"
+```
+
+### Local development
+
+```bash
+git clone https://github.com/laurentvv/free-llm-api-keys-python.git
 cd free-llm-api-keys-python
 uv sync
 uv run pytest

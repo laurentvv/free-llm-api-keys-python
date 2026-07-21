@@ -23,20 +23,24 @@ Modul Python yang menyediakan akses ke **kunci AI gratis** dari repositori [`ali
 
 ## Instalasi
 
-Proyek [uv](https://docs.astral.sh/uv/). Dalam proyek yang Anda gunakan:
+Paket ini belum dipublikasikan di PyPI. Anda dapat menginstalnya langsung dari GitHub.
+
+### Menggunakan `uv` (Disarankan)
 
 ```bash
-# from the local path
-uv add "C:/path/to/free-llm-api-keys-python"
-
-# or via git
-uv add "git+https://github.com/<your-user>/free-llm-api-keys-python.git"
+uv add "git+https://github.com/laurentvv/free-llm-api-keys-python.git"
 ```
 
-Pengembangan lokal:
+### Menggunakan `pip`
 
 ```bash
-git clone <this-repo>
+pip install "git+https://github.com/laurentvv/free-llm-api-keys-python.git"
+```
+
+### Pengembangan lokal
+
+```bash
+git clone https://github.com/laurentvv/free-llm-api-keys-python.git
 cd free-llm-api-keys-python
 uv sync
 uv run pytest
